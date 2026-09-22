@@ -1,0 +1,31 @@
+{
+  "tempAgeDays": 7,
+  "crashDumpAgeDays": 14,
+  "runDiskCleanup": true,
+  "runDism": true,
+  "emptyRecycleBin": false,
+  "steps": {
+    "nvidiaShaderCache": true,
+    "driverInstallers": true,
+    "oldAppVersions": true,
+    "browserCaches": true,
+    "appCaches": true,
+    "codeEditors": true,
+    "packageCaches": true,
+    "tempFiles": true,
+    "crashDumps": true,
+    "windows": true
+  },
+  "moveRules": [
+    {
+      "name": "Big installers",
+      "enabled": false,
+      "folder": "{Downloads}",
+      "include": ["*.exe", "*.msi", "*.iso"],
+      "minSizeMB": 200,
+      "minAgeDays": 7,
+      "destination": "D:\\Archives\\Installers"
+    }
+  ],
+  "extraCleanup": []
+}
