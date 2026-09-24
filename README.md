@@ -1,5 +1,10 @@
 # windows-disk-cleaner
 
+[![CI](https://github.com/slayerfx/windows-disk-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/slayerfx/windows-disk-cleaner/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PowerShell 5.1](https://img.shields.io/badge/PowerShell-5.1-5391FE.svg)](#requirements)
+[![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4.svg)](#requirements)
+
 **Free up space on your Windows system drive in one double-click, without touching your files.**
 
 *Version française : [README.fr.md](README.fr.md)*
