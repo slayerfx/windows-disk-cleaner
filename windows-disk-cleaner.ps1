@@ -116,7 +116,9 @@ $Messages = @{
         CbsLogs         = 'Anciens journaux CBS (plus de 30 jours)'
         WinLabel        = 'Nettoyage de disque Windows, optimisation de distribution, anciennes mises à jour'
         WinDryRun       = 'non estimable en simulation'
-        CleanmgrRunning = 'Nettoyage de disque de Windows : quelques minutes, une fenêtre de progression peut s''ouvrir...'
+        CleanmgrRunning = 'Nettoyage de disque de Windows : quelques minutes (30 au plus), une fenêtre de progression peut s''ouvrir...'
+        CleanmgrTimeout = 'Le Nettoyage de disque ne répond plus après 30 minutes : arrêté, la suite continue.'
+        CleanmgrStopped = 'Nettoyage de disque arrêté après 30 minutes'
         DismRunning     = 'Anciennes mises à jour (DISM) : quelques minutes, ne ferme pas la fenêtre...'
         StepRecycle     = 'Corbeille'
         RecycleLabel    = 'Corbeille vidée'
@@ -199,7 +201,9 @@ $Messages = @{
         CbsLogs         = 'Old CBS logs (older than 30 days)'
         WinLabel        = 'Windows Disk Cleanup, Delivery Optimization, old updates'
         WinDryRun       = 'cannot be estimated in a dry run'
-        CleanmgrRunning = 'Windows Disk Cleanup: a few minutes, a progress window may open...'
+        CleanmgrRunning = 'Windows Disk Cleanup: a few minutes (30 at most), a progress window may open...'
+        CleanmgrTimeout = 'Disk Cleanup still not done after 30 minutes: stopped, the run goes on.'
+        CleanmgrStopped = 'Disk Cleanup stopped after 30 minutes'
         DismRunning     = 'Old updates (DISM): a few minutes, do not close the window...'
         StepRecycle     = 'Recycle Bin'
         RecycleLabel    = 'Recycle Bin emptied'
@@ -423,11 +427,28 @@ function Invoke-DiskCleanup {
             [void]$flagged.Add($key)
         }
     }
-    if ($flagged.Count -eq 0) { return }
+    if ($flagged.Count -eq 0) { return $false }
     Write-Host ('   ' + (L 'CleanmgrRunning')) -ForegroundColor DarkGray
-    Start-Process -FilePath (Join-Path $env:windir 'System32\cleanmgr.exe') -ArgumentList ('/sagerun:{0}' -f $id) -Wait
-    Get-Process -Name 'cleanmgr' -ErrorAction SilentlyContinue | Wait-Process -Timeout 1800
+    # cleanmgr can hang without ever exiting: wait at most 30 minutes for it and the
+    # instances it starts, then stop them so the rest of the run (DISM, summary, log) happens.
+    # Instances started before this run (left over from an earlier one) are not waited for.
+    $started = (Get-Date).AddSeconds(-2)
+    $deadline = (Get-Date).AddMinutes(30)
+    Start-Process -FilePath (Join-Path $env:windir 'System32\cleanmgr.exe') -ArgumentList ('/sagerun:{0}' -f $id) | Out-Null
+    $timedOut = $false
+    while ($true) {
+        $running = @(Get-Process -Name 'cleanmgr' -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -ge $started })
+        if ($running.Count -eq 0) { break }
+        if ((Get-Date) -ge $deadline) {
+            $timedOut = $true
+            $running | Stop-Process -Force -ErrorAction SilentlyContinue
+            Write-Host ('   ' + (L 'CleanmgrTimeout')) -ForegroundColor Yellow
+            break
+        }
+        Start-Sleep -Seconds 5
+    }
     foreach ($key in $flagged) { Remove-ItemProperty -LiteralPath $key -Name $flag -ErrorAction SilentlyContinue }
+    return $timedOut
 }
 
 # =================================================================== Start
@@ -706,13 +727,14 @@ if (Test-Step 'windows') {
         if ($DryRun) { Add-Result (L 'WinLabel') 0 (L 'WinDryRun') }
         else {
             $before = Get-FreeSpace
-            if ($runDiskCleanup) { Invoke-DiskCleanup }
+            $winDetail = ''
+            if ($runDiskCleanup -and (Invoke-DiskCleanup)) { $winDetail = L 'CleanmgrStopped' }
             if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) { Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue }
             if ($runDism) {
                 Write-Host ('   ' + (L 'DismRunning')) -ForegroundColor DarkGray
                 & (Join-Path $env:windir 'System32\Dism.exe') /Online /Cleanup-Image /StartComponentCleanup
             }
-            Add-Result (L 'WinLabel') ([math]::Max(0, (Get-FreeSpace) - $before)) ''
+            Add-Result (L 'WinLabel') ([math]::Max(0, (Get-FreeSpace) - $before)) $winDetail
         }
     }
 }
