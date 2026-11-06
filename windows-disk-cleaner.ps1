@@ -663,7 +663,7 @@ if ($activeRules.Count -gt 0) {
     }
 }
 
-# -------------------------------------- Extra cleanup from the config (files only)
+# ------------- Extra cleanup from the config (files, or folders of old versions)
 $activeExtra = @($extraCleanup | Where-Object { $_ -and [bool](Get-Option $_ 'enabled' $true) -and (Get-Option $_ 'path' $null) })
 if ($activeExtra.Count -gt 0) {
     Write-Step (L 'StepExtra')
@@ -672,7 +672,25 @@ if ($activeExtra.Count -gt 0) {
         $label = [string](Get-Option $entry 'name' $pattern)
         # Refuse anything too close to a drive root, e.g. C:\* or C:\Windows\*
         if (($pattern.Split('\') | Where-Object { $_ }).Count -lt 4) { Add-Result $label 0 (L 'ExtraRefused'); continue }
+        $processes = [string[]]@(@(Get-Option $entry 'process' @()) | Where-Object { $_ })
+        if ($processes.Count -gt 0 -and (Test-Running $processes)) { Add-Result $label 0 (L 'AppOpen'); continue }
         $maxDate = (Get-Date).AddDays(-[double](Get-Option $entry 'minAgeDays' 0))
+        if ([bool](Get-Option $entry 'folders' $false)) {
+            # One folder per version (e.g. a game's shader cache per patch): keep the most recently
+            # used ones, by the newest file inside, and delete the others not used for minAgeDays
+            $keep = [math]::Max(1, [int](Get-Option $entry 'keepNewest' 1))
+            $folders = @(Get-ChildItem -Path $pattern -Directory -Force -ErrorAction SilentlyContinue | Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } | ForEach-Object {
+                $newest = Get-SafeFiles $_.FullName | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                $lastUse = $_.LastWriteTime
+                if ($newest -and $newest.LastWriteTime -gt $lastUse) { $lastUse = $newest.LastWriteTime }
+                [pscustomobject]@{ Folder = $_; LastUse = $lastUse }
+            } | Sort-Object LastUse -Descending)
+            $old = @($folders | Select-Object -Skip $keep | Where-Object { $_.LastUse -lt $maxDate } | ForEach-Object { $_.Folder })
+            $detail = ''
+            if ($folders.Count -gt 0) { $detail = (L 'AppKeeps') -f (($folders | Select-Object -First $keep | ForEach-Object { $_.Folder.Name }) -join ', ') }
+            Remove-Items $label $old $detail
+            continue
+        }
         $files = @(Get-ChildItem -Path $pattern -File -Force -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt $maxDate })
         Remove-Items $label $files ''
     }

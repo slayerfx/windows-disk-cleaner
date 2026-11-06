@@ -70,12 +70,19 @@ Tout fonctionne sans configuration. Pour personnaliser, copie `config.example.js
 ]
 ```
 
-**Les nettoyages personnalisés** suppriment des fichiers (jamais des dossiers) qui correspondent à un chemin. Les jokers et les variables d'environnement sont acceptés ; les chemins trop proches de la racine d'un disque sont refusés.
+**Les nettoyages personnalisés** suppriment des fichiers qui correspondent à un chemin (des dossiers seulement avec `"folders": true`, voir plus bas). Les jokers et les variables d'environnement sont acceptés ; les chemins trop proches de la racine d'un disque sont refusés.
 
 ```json
 "extraCleanup": [
   { "name": "Tampon de replay d'un jeu", "path": "C:\\Jeux\\UnJeu\\tmp\\replay.bin", "minAgeDays": 0 }
 ]
+```
+
+`process` (un nom ou une liste, sans `.exe`) saute l'entrée tant que ce programme est ouvert. Avec `"folders": true`, le chemin désigne des dossiers, un par version (par exemple le cache de shaders d'un jeu à chaque patch) : les `keepNewest` dossiers utilisés le plus récemment sont gardés (1 par défaut, jamais 0), et les autres sont supprimés s'ils n'ont pas servi depuis `minAgeDays` jours.
+
+```json
+{ "name": "Anciens shaders d'un jeu", "path": "%LOCALAPPDATA%\\UnJeu\\shaders_*",
+  "folders": true, "keepNewest": 1, "minAgeDays": 1, "process": "UnJeu" }
 ```
 
 ## En ligne de commande

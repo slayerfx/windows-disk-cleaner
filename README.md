@@ -70,12 +70,19 @@ Everything works without configuration. To customize, copy `config.example.json`
 ]
 ```
 
-**Extra cleanup** deletes files (never folders) matching a path pattern. Wildcards and environment variables are allowed; patterns too close to a drive root are refused.
+**Extra cleanup** deletes files matching a path pattern (folders only with `"folders": true`, see below). Wildcards and environment variables are allowed; patterns too close to a drive root are refused.
 
 ```json
 "extraCleanup": [
   { "name": "Game replay buffer", "path": "C:\\Games\\SomeGame\\tmp\\replay.bin", "minAgeDays": 0 }
 ]
+```
+
+`process` (a name or a list, without `.exe`) skips the entry while that program is running. With `"folders": true`, the path matches folders, one per version (for example a game's shader cache for each patch): the `keepNewest` most recently used folders are kept (1 by default, never 0), and the others are deleted if unused for `minAgeDays` days.
+
+```json
+{ "name": "Old game shaders", "path": "%LOCALAPPDATA%\\SomeGame\\shaders_*",
+  "folders": true, "keepNewest": 1, "minAgeDays": 1, "process": "SomeGame" }
 ```
 
 ## Command line
